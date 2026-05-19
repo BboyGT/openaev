@@ -1029,6 +1029,12 @@ public class ElasticService implements EngineService {
   }
 
   @Override
+  public void indexDocument(String index, String id, Object document) throws IOException {
+    elasticClient.index(
+        new IndexRequest.Builder<>().index(index).id(id).document(document).build());
+  }
+
+  @Override
   public ObjectMapper getObjectMapper() {
     return driver.getObjectMapper();
   }

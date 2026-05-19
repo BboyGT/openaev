@@ -22,6 +22,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.openaev.config.EngineConfig;
 import io.openaev.database.model.IndexingStatus;
 import io.openaev.database.repository.IndexingStatusRepository;
+import io.openaev.engine.AuditLogMappingBuilder;
 import io.openaev.engine.EngineContext;
 import io.openaev.engine.EsModel;
 import io.openaev.engine.model.EsBase;
@@ -114,10 +115,7 @@ public class ElasticDriver {
     }
     restClientBuilder.setHttpClientConfigCallback(hc -> clientBuilder);
     RestClient restClient = restClientBuilder.build();
-    JacksonJsonpMapper jsonpMapper = new JacksonJsonpMapper();
-    jsonpMapper.objectMapper().registerModule(new JavaTimeModule());
-    jsonpMapper.objectMapper().configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    jsonpMapper.objectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    JacksonJsonpMapper jsonpMapper = new JacksonJsonpMapper(engineObjectMapper);
     ElasticsearchTransport transport = new RestClientTransport(restClient, jsonpMapper);
     return new ElasticsearchClient(transport);
   }
@@ -151,6 +149,62 @@ public class ElasticDriver {
                     .build())
             .build();
     client.ilm().putLifecycle(lifecycleRequest);
+  }
+
+  /**
+   * Creates a dedicated ILM retention policy for the audit-log index. This policy includes a
+   * <b>hot</b> phase (rollover by size/age) and a <b>delete</b> phase (after the retention period).
+   */
+  private void createAuditLogRetentionPolicy(ElasticsearchClient client) {
+    try {
+      String policyName =
+          config.getIndexPrefix() + "-" + EngineConfig.AUDIT_LOG_INDEX_NAME + "-ilm-policy";
+      PutLifecycleRequest lifecycleRequest =
+          new PutLifecycleRequest.Builder()
+              .name(policyName)
+              .policy(
+                  new IlmPolicy.Builder()
+                      .phases(
+                          new Phases.Builder()
+                              .hot(
+                                  new Phase.Builder()
+                                      .actions(
+                                          new Actions.Builder()
+                                              .rollover(
+                                                  new RolloverAction.Builder()
+                                                      .maxPrimaryShardSize(
+                                                          config.getAuditLogRolloverMaxSize())
+                                                      .maxAge(
+                                                          co.elastic.clients.elasticsearch._types
+                                                              .Time.of(
+                                                              t ->
+                                                                  t.time(
+                                                                      config
+                                                                          .getAuditLogRolloverMaxAge())))
+                                                      .build())
+                                              .setPriority(
+                                                  new SetPriorityAction.Builder()
+                                                      .priority(100)
+                                                      .build())
+                                              .build())
+                                      .build())
+                              .delete(
+                                  new Phase.Builder()
+                                      .minAge(
+                                          co.elastic.clients.elasticsearch._types.Time.of(
+                                              t -> t.time(config.getAuditLogRetentionDays() + "d")))
+                                      .actions(
+                                          new Actions.Builder()
+                                              .delete(new DeleteAction.Builder().build())
+                                              .build())
+                                      .build())
+                              .build())
+                      .build())
+              .build();
+      client.ilm().putLifecycle(lifecycleRequest);
+    } catch (Exception e) {
+      log.warn("Failed to create audit-log ILM retention policy: {}", e.getMessage(), e);
+    }
   }
 
   private void createCoreSettings(ElasticsearchClient client) throws IOException {
@@ -317,6 +371,7 @@ public class ElasticDriver {
     // Initialize elastic if needed.
     createRolloverPolicy(elasticClient);
     createCoreSettings(elasticClient);
+    createAuditLogRetentionPolicy(elasticClient);
     // TODO Fetch the current model versions
     // | type     | last_updated_at      | version db | elastic version
     // | findings | 2024-12-04T12:00:00Z | 2.0        | 1.0
@@ -341,7 +396,107 @@ public class ElasticDriver {
                 throw new RuntimeException(e);
               }
             });
+    // Create audit-log index with custom mapping (nested objects + dynamic context_data)
+    setupAuditLogIndex(elasticClient);
     return elasticClient;
+  }
+
+  /**
+   * Creates the audit-log index with a custom mapping. Unlike other indices whose mappings are
+   * generated via reflection, the audit-log index uses nested objects ({@code user_metadata}) and a
+   * dynamic sub-object ({@code context_data}) that cannot be expressed through the generic mapping
+   * generator.
+   */
+  private void setupAuditLogIndex(ElasticsearchClient client) {
+    try {
+      String indexName = config.getIndexPrefix() + "_" + EngineConfig.AUDIT_LOG_INDEX_NAME;
+      String coreSettings = config.getIndexPrefix() + ES_CORE_SETTINGS;
+      String auditLogPolicy =
+          config.getIndexPrefix() + "-" + EngineConfig.AUDIT_LOG_INDEX_NAME + "-ilm-policy";
+
+      Map<String, Property> props = buildAuditLogMapping();
+
+      TypeMapping indexMapping =
+          new TypeMapping.Builder()
+              .dynamic(DynamicMapping.Strict)
+              .dateDetection(false)
+              .numericDetection(false)
+              .properties(props)
+              .build();
+
+      // -- Index template --
+      PutIndexTemplateRequest.Builder template = new PutIndexTemplateRequest.Builder();
+      template.name(indexName);
+      template.meta("version", JsonData.of(ES_MODEL_VERSION));
+      template.indexPatterns(indexName + "*");
+      template.composedOf(coreSettings);
+      template.template(
+          new IndexTemplateMapping.Builder()
+              .settings(
+                  new IndexSettings.Builder()
+                      .lifecycle(
+                          new IndexSettingsLifecycle.Builder()
+                              .name(auditLogPolicy)
+                              .rolloverAlias(indexName)
+                              .build())
+                      .mapping(
+                          new MappingLimitSettings.Builder()
+                              .totalFields(
+                                  new MappingLimitSettingsTotalFields.Builder()
+                                      .limit(config.getMaxFieldsSize())
+                                      .build())
+                              .build())
+                      .build())
+              .mappings(indexMapping)
+              .build());
+      client.indices().putIndexTemplate(template.build());
+
+      // -- Create index if it does not exist --
+      try {
+        client.indices().get(new GetIndexRequest.Builder().index(indexName).build());
+      } catch (ElasticsearchException e) {
+        client
+            .indices()
+            .create(
+                new CreateIndexRequest.Builder()
+                    .index(indexName + config.getIndexSuffix())
+                    .aliases(indexName, new Alias.Builder().build())
+                    .build());
+        log.info("Created audit-log index: {}{}", indexName, config.getIndexSuffix());
+      }
+    } catch (Exception e) {
+      log.warn("Failed to setup audit-log index: {}", e.getMessage(), e);
+    }
+  }
+
+  /** Builds the audit-log ES mapping from the driver-agnostic {@link AuditLogMappingBuilder}. */
+  private Map<String, Property> buildAuditLogMapping() {
+    Map<String, Property> props = new HashMap<>();
+    for (var entry : AuditLogMappingBuilder.buildMapping().entrySet()) {
+      props.put(entry.getKey(), toElasticProperty(entry.getValue()));
+    }
+    return props;
+  }
+
+  private Property toElasticProperty(AuditLogMappingBuilder.MappedField field) {
+    return switch (field.type()) {
+      case KEYWORD -> new Property.Builder().keyword(new KeywordProperty.Builder().build()).build();
+      case DATE -> new Property.Builder().date(new DateProperty.Builder().build()).build();
+      case OBJECT_NESTED -> {
+        Map<String, Property> nested = new HashMap<>();
+        for (var entry : field.children().entrySet()) {
+          nested.put(entry.getKey(), toElasticProperty(entry.getValue()));
+        }
+        yield new Property.Builder()
+            .object(new ObjectProperty.Builder().properties(nested).build())
+            .build();
+      }
+      case OBJECT_DYNAMIC ->
+          new Property.Builder()
+              .object(
+                  new ObjectProperty.Builder().enabled(true).dynamic(DynamicMapping.True).build())
+              .build();
+    };
   }
 
   public void cleanUpIndex(String indexName, ElasticsearchClient client) throws IOException {

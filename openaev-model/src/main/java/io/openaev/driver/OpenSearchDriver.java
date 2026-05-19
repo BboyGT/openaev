@@ -8,6 +8,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.openaev.config.EngineConfig;
 import io.openaev.database.model.IndexingStatus;
 import io.openaev.database.repository.IndexingStatusRepository;
+import io.openaev.engine.AuditLogMappingBuilder;
 import io.openaev.engine.EngineContext;
 import io.openaev.engine.EsModel;
 import io.openaev.engine.model.EsBase;
@@ -145,10 +146,7 @@ public class OpenSearchDriver {
               .setDefaultCredentialsProvider(credentialsProvider)
               .setConnectionManager(connectionManager);
         });
-    JacksonJsonpMapper jsonpMapper = new JacksonJsonpMapper();
-    jsonpMapper.objectMapper().registerModule(new JavaTimeModule());
-    jsonpMapper.objectMapper().configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    jsonpMapper.objectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    JacksonJsonpMapper jsonpMapper = new JacksonJsonpMapper(engineObjectMapper);
     builder.setMapper(jsonpMapper);
     final OpenSearchTransport transport = builder.build();
     return new OpenSearchClient(transport);
@@ -233,6 +231,92 @@ public class OpenSearchDriver {
         String message = body.isPresent() ? body.get().bodyAsString() : "no response";
         throw new IOException(message);
       }
+    }
+  }
+
+  /**
+   * Creates a dedicated ISM retention policy for the audit-log index. Lifecycle: <b>hot</b>
+   * (rollover by size/age) → <b>delete</b> (after retention period).
+   */
+  private void createAuditLogRetentionPolicy(OpenSearchClient client) {
+    try {
+      String indexName = config.getIndexPrefix() + "_" + EngineConfig.AUDIT_LOG_INDEX_NAME;
+      String policyName = indexName + "-retention-policy";
+      String endpoint = "/_plugins/_ism/policies/" + policyName;
+
+      // Skip if the policy already exists
+      try (Response response =
+          client.generic().execute(Requests.builder().endpoint(endpoint).method("GET").build())) {
+        if (response.getStatus() != 404) {
+          return;
+        }
+      }
+
+      String jsonRequest =
+          String.format(
+              """
+              {
+                "policy": {
+                  "description": "Audit log retention policy — rollover + delete after %dd",
+                  "default_state": "hot",
+                  "states": [
+                    {
+                      "name": "hot",
+                      "actions": [
+                        {
+                          "rollover": {
+                            "min_primary_shard_size": "%s",
+                            "min_index_age": "%s"
+                          }
+                        }
+                      ],
+                      "transitions": [
+                        {
+                          "state_name": "delete",
+                          "conditions": {
+                            "min_index_age": "%dd"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "delete",
+                      "actions": [
+                        {
+                          "delete": {}
+                        }
+                      ],
+                      "transitions": []
+                    }
+                  ],
+                  "ism_template": {
+                    "index_patterns": ["%s*"],
+                    "priority": 200
+                  }
+                }
+              }
+              """,
+              config.getAuditLogRetentionDays(),
+              config.getAuditLogRolloverMaxSize(),
+              config.getAuditLogRolloverMaxAge(),
+              config.getAuditLogRetentionDays(),
+              indexName);
+
+      try (Response response =
+          client
+              .generic()
+              .execute(
+                  Requests.builder().endpoint(endpoint).method("PUT").json(jsonRequest).build())) {
+        final int status = response.getStatus();
+        log.info("Create audit log retention policy: {}", status);
+        if (status != 201) {
+          Optional<Body> body = response.getBody();
+          String message = body.isPresent() ? body.get().bodyAsString() : "no response";
+          log.warn("Failed to create audit-log ISM retention policy: {}", message);
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to create audit-log ISM retention policy: {}", e.getMessage(), e);
     }
   }
 
@@ -426,6 +510,7 @@ public class OpenSearchDriver {
     // Initialize opensearch if needed.
     createRolloverPolicy(openClient);
     createCoreSettings(openClient);
+    createAuditLogRetentionPolicy(openClient);
     // TODO Fetch the current model versions
     // | type     | last_updated_at      | version db | search version
     // | findings | 2024-12-04T12:00:00Z | 2.0        | 1.0
@@ -451,7 +536,115 @@ public class OpenSearchDriver {
                     "Error while cleanup of indexes with Opensearch - " + e);
               }
             });
+    // Create audit-log index with custom mapping (nested objects + dynamic context_data)
+    setupAuditLogIndex(openClient);
     return openClient;
+  }
+
+  /**
+   * Creates the audit-log index with a custom mapping. Unlike other indices whose mappings are
+   * generated via reflection, the audit-log index uses nested objects ({@code user_metadata}) and a
+   * dynamic sub-object ({@code context_data}) that cannot be expressed through the generic mapping
+   * generator.
+   */
+  private void setupAuditLogIndex(OpenSearchClient client) {
+    try {
+      String indexName = config.getIndexPrefix() + "_" + EngineConfig.AUDIT_LOG_INDEX_NAME;
+      String coreSettings = config.getIndexPrefix() + ES_CORE_SETTINGS;
+
+      Map<String, Property> props = buildAuditLogMapping();
+
+      TypeMapping indexMapping =
+          new TypeMapping.Builder()
+              .dynamic(DynamicMapping.Strict)
+              .dateDetection(false)
+              .numericDetection(false)
+              .properties(props)
+              .build();
+
+      // -- Index template --
+      PutIndexTemplateRequest.Builder template = new PutIndexTemplateRequest.Builder();
+      template.name(indexName);
+      template.meta("version", JsonData.of(ES_MODEL_VERSION));
+      template.indexPatterns(indexName + "*");
+      template.composedOf(coreSettings);
+      template.template(
+          new IndexTemplateMapping.Builder()
+              .settings(
+                  new IndexSettings.Builder()
+                      .customSettings(
+                          Map.of(
+                              "plugins",
+                              JsonData.of(
+                                  String.format(
+                                      """
+                                    "index_state_management": {
+                                      "rollover_alias": "%s",
+                                    }
+                              """,
+                                      indexName))))
+                      .mapping(
+                          new IndexSettingsMapping.Builder()
+                              .totalFields(
+                                  new IndexSettingsMappingLimitTotalFields.Builder()
+                                      .limit(Long.parseLong(config.getMaxFieldsSize()))
+                                      .build())
+                              .build())
+                      .build()
+                      .index())
+              .mappings(indexMapping)
+              .build());
+      client.indices().putIndexTemplate(template.build());
+
+      // -- Create index if it does not exist --
+      try {
+        client.indices().get(new GetIndexRequest.Builder().index(indexName).build());
+      } catch (OpenSearchException e) {
+        client
+            .indices()
+            .create(
+                new CreateIndexRequest.Builder()
+                    .index(indexName + config.getIndexSuffix())
+                    .aliases(indexName, new Alias.Builder().build())
+                    .build());
+        log.info("Created audit-log index: {}{}", indexName, config.getIndexSuffix());
+      }
+    } catch (Exception e) {
+      log.warn("Failed to setup audit-log index: {}", e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Builds the audit-log OpenSearch mapping from the driver-agnostic {@link
+   * AuditLogMappingBuilder}.
+   */
+  private Map<String, Property> buildAuditLogMapping() {
+    Map<String, Property> props = new HashMap<>();
+    for (var entry : AuditLogMappingBuilder.buildMapping().entrySet()) {
+      props.put(entry.getKey(), toOpenSearchProperty(entry.getValue()));
+    }
+    return props;
+  }
+
+  private Property toOpenSearchProperty(AuditLogMappingBuilder.MappedField field) {
+    return switch (field.type()) {
+      case KEYWORD -> new Property.Builder().keyword(new KeywordProperty.Builder().build()).build();
+      case DATE -> new Property.Builder().date(new DateProperty.Builder().build()).build();
+      case OBJECT_NESTED -> {
+        Map<String, Property> nested = new HashMap<>();
+        for (var entry : field.children().entrySet()) {
+          nested.put(entry.getKey(), toOpenSearchProperty(entry.getValue()));
+        }
+        yield new Property.Builder()
+            .object(new ObjectProperty.Builder().properties(nested).build())
+            .build();
+      }
+      case OBJECT_DYNAMIC ->
+          new Property.Builder()
+              .object(
+                  new ObjectProperty.Builder().enabled(true).dynamic(DynamicMapping.True).build())
+              .build();
+    };
   }
 
   /**
