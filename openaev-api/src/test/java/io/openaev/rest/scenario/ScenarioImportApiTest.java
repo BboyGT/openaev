@@ -68,7 +68,7 @@ public class ScenarioImportApiTest extends IntegrationTest {
     injectsImportInput.setName("TEST");
     injectsImportInput.setTimezoneOffset(120);
 
-    when(importMapperRepository.findByIdAndTenantId(any(), any()))
+    when(importMapperRepository.findById(any()))
         .thenReturn(Optional.of(new ImportMapper()));
     when(injectImportService.importInjectIntoScenarioFromXLS(
             any(), any(), any(), any(), anyInt(), anyBoolean()))
@@ -102,7 +102,7 @@ public class ScenarioImportApiTest extends IntegrationTest {
     injectsImportInput.setName("TEST");
     injectsImportInput.setTimezoneOffset(120);
 
-    when(importMapperRepository.findByIdAndTenantId(any(), any()))
+    when(importMapperRepository.findById(any()))
         .thenReturn(Optional.of(new ImportMapper()));
     when(injectImportService.importInjectIntoScenarioFromXLS(
             any(), any(), any(), any(), anyInt(), anyBoolean()))
