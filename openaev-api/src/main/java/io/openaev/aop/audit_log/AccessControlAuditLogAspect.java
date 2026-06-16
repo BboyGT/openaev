@@ -5,12 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.openaev.aop.AccessControl;
 import io.openaev.aop.AccessControlAspect;
+import io.openaev.database.audit.EntityDiffContext;
 import io.openaev.database.model.Action;
 import io.openaev.database.model.EventStatus;
 import io.openaev.database.model.ResourceType;
 import io.openaev.service.LogService;
 import io.openaev.utils.log.LogUtils;
 import java.lang.annotation.Annotation;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import lombok.RequiredArgsConstructor;
@@ -132,6 +134,9 @@ public class AccessControlAuditLogAspect {
       JsonNode inputNode = getInputNode(joinPoint, eventScope);
       JsonNode signatureNode = getMethodSignature(joinPoint, inputNode);
 
+      // Capture snapshots on the servlet thread before any async handoff.
+      Map<String, EntityDiffContext.EntitySnapshot> snapshots = captureEntitySnapshots();
+
       BiConsumer<Boolean, Throwable> logCompletion =
           (success, throwable) -> {
             if (throwable != null || (success != null && !success)) {
@@ -152,10 +157,25 @@ public class AccessControlAuditLogAspect {
               inputNode,
               outputNode,
               signatureNode,
+              snapshots,
               logUUID)
           .whenComplete(logCompletion);
     } catch (Exception ex) {
       log.warn(LOG_ERROR_MSG, ex);
+    }
+  }
+
+  /**
+   * Captures all pending entity snapshots from {@link EntityDiffContext}. Must be called on the
+   * servlet thread before any async handoff, since {@link EntityDiffContext} is request-scoped.
+   */
+  private Map<String, EntityDiffContext.EntitySnapshot> captureEntitySnapshots() {
+    try {
+      return EntityDiffContext.consumeAllSnapshots();
+    } catch (Exception e) {
+      log.debug("[AUDIT] Failed to capture entity snapshots: {}", e.getMessage());
+      EntityDiffContext.clear();
+      return null;
     }
   }
 
