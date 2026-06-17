@@ -1,7 +1,7 @@
 package io.openaev.rest;
 
-import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.CHALLENGE;
-import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.MANUAL;
+import static io.openaev.database.model.BaseInjectExpectation.EXPECTATION_TYPE.CHALLENGE;
+import static io.openaev.database.model.BaseInjectExpectation.EXPECTATION_TYPE.MANUAL;
 import static io.openaev.expectation.ExpectationPropertiesConfig.DEFAULT_TECHNICAL_EXPECTATION_EXPIRATION_TIME;
 import static io.openaev.expectation.ExpectationType.*;
 import static io.openaev.integration.impl.injectors.openaev.OpenaevInjectorIntegration.OPENAEV_INJECTOR_NAME;
@@ -170,7 +170,7 @@ class ExpectationApiTest extends IntegrationTest {
       // -- EXECUTE --
 
       // Retrieve Agent expectation
-      List<InjectExpectation> injectExpectations =
+      List<BaseInjectExpectation> injectExpectations =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent1.getId());
 
@@ -277,7 +277,7 @@ class ExpectationApiTest extends IntegrationTest {
       // -- EXECUTE --
 
       // Retrieve Agent expectation
-      List<InjectExpectation> injectExpectations =
+      List<BaseInjectExpectation> injectExpectations =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent1.getId());
 
@@ -415,7 +415,7 @@ class ExpectationApiTest extends IntegrationTest {
           executableInject, detectionExpectations);
 
       // Update one expectation from one agent with source collector-id
-      List<InjectExpectation> injectExpectations =
+      List<BaseInjectExpectation> injectExpectations =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent1.getId());
 
@@ -498,7 +498,7 @@ class ExpectationApiTest extends IntegrationTest {
       // -- PREPARE --
       // Update one expectation from one agent with source collector-id then this expectation is
       // filled and it should return just one
-      List<InjectExpectation> injectExpectations =
+      List<BaseInjectExpectation> injectExpectations =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent2.getId());
 
@@ -584,7 +584,7 @@ class ExpectationApiTest extends IntegrationTest {
       // -- PREPARE --
       // Update one expectation from one agent with source collector-id then it should return one
       // expectation
-      List<InjectExpectation> injectExpectations =
+      List<BaseInjectExpectation> injectExpectations =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent2.getId());
 
@@ -648,7 +648,7 @@ class ExpectationApiTest extends IntegrationTest {
       // -- EXECUTE --
 
       // Retrieve Agent expectation
-      List<InjectExpectation> injectExpectationsAgent =
+      List<BaseInjectExpectation> injectExpectationsAgent =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent1.getId());
 
@@ -659,7 +659,7 @@ class ExpectationApiTest extends IntegrationTest {
 
       // -- ASSERT --
       // Agent Expectation
-      List<InjectExpectation> injectExpectations =
+      List<BaseInjectExpectation> injectExpectations =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent1.getId());
       assertEquals(100.0, getResultScoreForCollector(injectExpectations, savedCollector).get());
@@ -677,7 +677,7 @@ class ExpectationApiTest extends IntegrationTest {
       // -- EXECUTE --
 
       // Retrieve Agent1 expectation
-      List<InjectExpectation> injectExpectationsAgent1 =
+      List<BaseInjectExpectation> injectExpectationsAgent1 =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent2.getId());
 
@@ -730,7 +730,7 @@ class ExpectationApiTest extends IntegrationTest {
       // -- EXECUTE --
 
       // Retrieve Agent expectation
-      List<InjectExpectation> injectExpectations =
+      List<BaseInjectExpectation> injectExpectations =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent1.getId());
 
@@ -786,14 +786,14 @@ class ExpectationApiTest extends IntegrationTest {
       em.flush();
       em.clear();
 
-      // Fetch injectExpectation created for agent 1
-      List<InjectExpectation> injectExpectationsAgent1 =
+      // Fetch BaseInjectExpectation created for agent 1
+      List<BaseInjectExpectation> injectExpectationsAgent1 =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent1.getId());
       InjectExpectationUpdateInput expectationUpdateInputAgent1 =
           getInjectExpectationUpdateInput(savedCollector.getId(), "Detected", true);
-      // Fetch injectExpectation created for agent 2
-      List<InjectExpectation> injectExpectationsAgent2 =
+      // Fetch BaseInjectExpectation created for agent 2
+      List<BaseInjectExpectation> injectExpectationsAgent2 =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent2.getId());
       InjectExpectationUpdateInput expectationUpdateInputAgent2 =
@@ -816,7 +816,7 @@ class ExpectationApiTest extends IntegrationTest {
 
       // -- ASSERT --
       // Agent Expectation
-      List<InjectExpectation> injectExpectations =
+      List<BaseInjectExpectation> injectExpectations =
           injectExpectationRepository.findAllByInjectAndAgent(
               savedInject.getId(), savedAgent1.getId());
       assertEquals(100.0, getResultScoreForCollector(injectExpectations, savedCollector).get());
@@ -984,12 +984,12 @@ class ExpectationApiTest extends IntegrationTest {
         emptyList());
   }
 
-  private Double getScore(@NotNull final List<InjectExpectation> injectExpectations) {
+  private Double getScore(@NotNull final List<BaseInjectExpectation> injectExpectations) {
     return injectExpectations.getFirst().getScore();
   }
 
   private Optional<Double> getResultScoreForCollector(
-      @NotNull final List<InjectExpectation> injectExpectations,
+      @NotNull final List<BaseInjectExpectation> injectExpectations,
       @NotNull final Collector collector) {
     return injectExpectations.getFirst().getResults().stream()
         .filter(result -> result.getSourceId().equals(collector.getId()))
@@ -1000,11 +1000,11 @@ class ExpectationApiTest extends IntegrationTest {
   // MVC CALL
 
   private void callUpdateInjectExpectation(
-      @NotNull final InjectExpectation injectExpectation,
+      @NotNull final BaseInjectExpectation BaseInjectExpectation,
       @NotNull final InjectExpectationUpdateInput expectationUpdateInput)
       throws Exception {
     mvc.perform(
-            put(INJECTS_EXPECTATIONS_URI + "/" + injectExpectation.getId())
+            put(INJECTS_EXPECTATIONS_URI + "/" + BaseInjectExpectation.getId())
                 .content(asJsonString(expectationUpdateInput))
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
@@ -1013,11 +1013,11 @@ class ExpectationApiTest extends IntegrationTest {
   }
 
   private void callUpdateInjectExpectationFromUI(
-      @NotNull final InjectExpectation injectExpectation,
+      @NotNull final BaseInjectExpectation BaseInjectExpectation,
       @NotNull final ExpectationUpdateInput expectationUpdateInput)
       throws Exception {
     mvc.perform(
-            put(EXPECTATIONS_URI + "/" + injectExpectation.getId())
+            put(EXPECTATIONS_URI + "/" + BaseInjectExpectation.getId())
                 .content(asJsonString(expectationUpdateInput))
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
@@ -1026,13 +1026,13 @@ class ExpectationApiTest extends IntegrationTest {
   }
 
   private void callDeleteInjectExpectationFromUI(
-      @NotNull final InjectExpectation injectExpectation,
+      @NotNull final BaseInjectExpectation BaseInjectExpectation,
       @NotNull final ExpectationUpdateInput expectationUpdateInput)
       throws Exception {
     mvc.perform(
             put(EXPECTATIONS_URI
                     + "/"
-                    + injectExpectation.getId()
+                    + BaseInjectExpectation.getId()
                     + "/"
                     + expectationUpdateInput.getSourceId()
                     + "/delete")

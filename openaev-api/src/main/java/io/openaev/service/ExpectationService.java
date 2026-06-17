@@ -1,7 +1,7 @@
 package io.openaev.service;
 
-import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.*;
-import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.VULNERABILITY;
+import static io.openaev.database.model.BaseInjectExpectation.EXPECTATION_TYPE.*;
+import static io.openaev.database.model.BaseInjectExpectation.EXPECTATION_TYPE.VULNERABILITY;
 import static io.openaev.database.model.InjectorContract.*;
 
 import com.fasterxml.jackson.core.type.TypeReference;
