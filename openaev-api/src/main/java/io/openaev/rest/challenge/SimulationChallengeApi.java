@@ -86,7 +86,8 @@ public class SimulationChallengeApi extends RestBehavior {
     if (user.getId().equals(ANONYMOUS)) {
       throw new UnsupportedOperationException("User must be logged or dynamic player is required");
     }
-    return challengeService.validateChallenge(exerciseId, challengeId, input, user);
+    return challengeService.validateChallenge(exerciseId, challengeId, input, user,
+        TenantContext.getCurrentTenant());
   }
 
   @GetMapping({
