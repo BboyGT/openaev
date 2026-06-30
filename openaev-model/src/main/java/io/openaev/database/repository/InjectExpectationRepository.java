@@ -342,16 +342,26 @@ public interface InjectExpectationRepository
           """
     WITH changed_expectations AS (
         SELECT ie.inject_expectation_id FROM injects_expectations ie
-          WHERE ie.inject_expectation_updated_at > :from
+          WHERE ie.agent_id IS NULL AND ie.inject_expectation_updated_at > :from
         UNION
         SELECT ie.inject_expectation_id FROM injects_expectations ie
           JOIN injects i ON i.inject_id = ie.inject_id
-          WHERE i.inject_updated_at > :from
+          WHERE ie.agent_id IS NULL AND i.inject_updated_at > :from
         UNION
         SELECT ie.inject_expectation_id FROM injects_expectations ie
           JOIN injects i ON i.inject_id = ie.inject_id
           JOIN injectors_contracts ic ON ic.injector_contract_id = i.inject_injector_contract
-          WHERE ic.injector_contract_updated_at > :from
+          WHERE ie.agent_id IS NULL AND ic.injector_contract_updated_at > :from
+    ),
+    ranked_expectations AS (
+      SELECT ce.inject_expectation_id,
+        GREATEST(ie.inject_expectation_updated_at, i.inject_updated_at, COALESCE(ic.injector_contract_updated_at, ie.inject_expectation_updated_at)) AS sort_ts
+      FROM changed_expectations ce
+      JOIN injects_expectations ie ON ie.inject_expectation_id = ce.inject_expectation_id
+      JOIN injects i ON i.inject_id = ie.inject_id
+      LEFT JOIN injectors_contracts ic ON ic.injector_contract_id = i.inject_injector_contract
+      ORDER BY sort_ts ASC
+      LIMIT :limit
     ),
     inject_expectation_data AS (
       SELECT
@@ -382,7 +392,7 @@ public interface InjectExpectationRepository
       array_agg(DISTINCT c.collector_security_platform) FILTER ( WHERE c.collector_security_platform IS NOT NULL ) ||
       array_agg(DISTINCT a.asset_id) FILTER ( WHERE a.asset_id IS NOT NULL ) AS security_platform_ids
     FROM injects_expectations ie
-    JOIN changed_expectations ce ON ie.inject_expectation_id = ce.inject_expectation_id
+    JOIN ranked_expectations re ON ie.inject_expectation_id = re.inject_expectation_id
     LEFT JOIN exercises ex ON ex.exercise_id = ie.exercise_id
     LEFT JOIN injects i ON i.inject_id = ie.inject_id
     LEFT JOIN injects_statuses ins ON ins.status_inject = i.inject_id
@@ -405,9 +415,7 @@ public interface InjectExpectationRepository
         i.tenant_id
     )
     SELECT * FROM inject_expectation_data ied
-    WHERE ied.agent_id IS NULL
     ORDER BY ied.inject_expectation_updated_at ASC
-    LIMIT :limit
     """,
       nativeQuery = true)
   List<RawInjectExpectationIndexing> findForIndexing(
