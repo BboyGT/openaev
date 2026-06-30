@@ -1,5 +1,10 @@
 package io.openaev.service;
 
+import static io.openaev.utils.fixtures.InjectExpectationFixture.createVulnerabilityInjectExpectation;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -18,6 +23,9 @@ import io.openaev.rest.inject.service.ExecutionProcessingContext;
 import io.openaev.rest.inject.service.InjectService;
 import io.openaev.utils.ExpectationUtils;
 import io.openaev.utils.fixtures.*;
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -28,15 +36,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.lang.reflect.Method;
-import java.util.*;
-import java.util.stream.Stream;
-
-import static io.openaev.utils.fixtures.InjectExpectationFixture.createVulnerabilityInjectExpectation;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class InjectExpectationServiceTest {
@@ -141,9 +140,7 @@ class InjectExpectationServiceTest {
   }
 
   private void invokeComputeExpectationsForAssetGroup(
-      List<Expectation> expectations,
-      BaseInjectContent content,
-      AssetGroup assetGroup)
+      List<Expectation> expectations, BaseInjectContent content, AssetGroup assetGroup)
       throws Exception {
     Method method =
         InjectExpectationService.class.getDeclaredMethod(

@@ -1,18 +1,5 @@
 package io.openaev.utils;
 
-import io.openaev.database.model.*;
-import io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE;
-import io.openaev.expectation.*;
-import io.openaev.rest.exception.ElementNotFoundException;
-import io.openaev.rest.inject.service.AssetToExecute;
-import jakarta.validation.constraints.NotNull;
-
-import java.time.Instant;
-import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.stream.Stream;
-
 import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.*;
 import static io.openaev.expectation.DetectionExpectation.detectionExpectationForAgent;
 import static io.openaev.expectation.DetectionExpectation.detectionExpectationForAsset;
@@ -25,6 +12,18 @@ import static io.openaev.utils.ExpectationSignatureUtils.EXPECTATION_SIGNATURE_T
 import static io.openaev.utils.VulnerabilityExpectationUtils.vulnerabilityExpectationForAgent;
 import static io.openaev.utils.VulnerabilityExpectationUtils.vulnerabilityExpectationForAsset;
 import static io.openaev.utils.inject_expectation_result.ExpectationResultBuilder.buildForMediaPressure;
+
+import io.openaev.database.model.*;
+import io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE;
+import io.openaev.expectation.*;
+import io.openaev.rest.exception.ElementNotFoundException;
+import io.openaev.rest.inject.service.AssetToExecute;
+import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
+import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * Utility class for creating and managing inject expectations.

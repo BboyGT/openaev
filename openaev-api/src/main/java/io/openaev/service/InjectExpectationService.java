@@ -1,5 +1,20 @@
 package io.openaev.service;
 
+import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.*;
+import static io.openaev.expectation.DetectionExpectation.detectionExpectationForAssetGroup;
+import static io.openaev.expectation.ExpectationType.VULNERABILITY;
+import static io.openaev.expectation.ManualExpectation.manualExpectationForAssetGroup;
+import static io.openaev.expectation.PreventionExpectation.preventionExpectationForAssetGroup;
+import static io.openaev.helper.StreamHelper.fromIterable;
+import static io.openaev.service.InjectExpectationUtils.computeScores;
+import static io.openaev.service.InjectExpectationUtils.expectationConverter;
+import static io.openaev.utils.AgentUtils.getActiveAgents;
+import static io.openaev.utils.AgentUtils.getPrimaryAgents;
+import static io.openaev.utils.ExpectationSignatureUtils.*;
+import static io.openaev.utils.ExpectationUtils.*;
+import static io.openaev.utils.VulnerabilityExpectationUtils.vulnerabilityExpectationForAssetGroup;
+import static io.openaev.utils.inject_expectation_result.ExpectationResultBuilder.*;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +39,12 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -33,28 +54,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.*;
-import static io.openaev.expectation.DetectionExpectation.detectionExpectationForAssetGroup;
-import static io.openaev.expectation.ExpectationType.VULNERABILITY;
-import static io.openaev.expectation.ManualExpectation.manualExpectationForAssetGroup;
-import static io.openaev.expectation.PreventionExpectation.preventionExpectationForAssetGroup;
-import static io.openaev.helper.StreamHelper.fromIterable;
-import static io.openaev.service.InjectExpectationUtils.computeScores;
-import static io.openaev.service.InjectExpectationUtils.expectationConverter;
-import static io.openaev.utils.AgentUtils.getActiveAgents;
-import static io.openaev.utils.AgentUtils.getPrimaryAgents;
-import static io.openaev.utils.ExpectationSignatureUtils.*;
-import static io.openaev.utils.ExpectationUtils.*;
-import static io.openaev.utils.VulnerabilityExpectationUtils.vulnerabilityExpectationForAssetGroup;
-import static io.openaev.utils.inject_expectation_result.ExpectationResultBuilder.*;
 
 @Slf4j
 @RequiredArgsConstructor
