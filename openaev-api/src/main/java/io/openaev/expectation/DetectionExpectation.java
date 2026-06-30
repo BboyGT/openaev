@@ -1,16 +1,16 @@
-package io.openaev.model.expectation;
-
-import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.DETECTION;
+package io.openaev.expectation;
 
 import io.openaev.database.model.*;
-import io.openaev.model.Expectation;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.util.List;
-import java.util.Objects;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.List;
+import java.util.Objects;
+
+import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.DETECTION;
 
 /**
  * Expectation that requires security tools to detect an injected activity.
@@ -59,7 +59,7 @@ public class DetectionExpectation implements Expectation {
   private Long expirationTime;
 
   /** Signatures that can satisfy this detection expectation. */
-  private List<InjectExpectationSignature> injectExpectationSignatures;
+  private List<ExpectationSignature> expectationSignatures;
 
   private DetectionExpectation() {}
 
@@ -78,7 +78,7 @@ public class DetectionExpectation implements Expectation {
    * @param asset the asset where the agent resides
    * @param assetGroup optional asset group for grouping
    * @param expirationTime time in seconds until expiration
-   * @param injectExpectationSignatures signatures that satisfy this expectation
+   * @param expectationSignatures signatures that satisfy this expectation
    * @return a configured DetectionExpectation
    */
   public static DetectionExpectation detectionExpectationForAgent(
@@ -89,7 +89,7 @@ public class DetectionExpectation implements Expectation {
       @NotNull final Asset asset,
       final AssetGroup assetGroup,
       final Long expirationTime,
-      List<InjectExpectationSignature> injectExpectationSignatures) {
+      List<ExpectationSignature> expectationSignatures) {
     DetectionExpectation detectionExpectation = new DetectionExpectation();
     detectionExpectation.setScore(Objects.requireNonNullElse(score, 100.0));
     detectionExpectation.setName(name);
@@ -98,7 +98,7 @@ public class DetectionExpectation implements Expectation {
     detectionExpectation.setAsset(asset);
     detectionExpectation.setAssetGroup(assetGroup);
     detectionExpectation.setExpirationTime(expirationTime);
-    detectionExpectation.setInjectExpectationSignatures(injectExpectationSignatures);
+    detectionExpectation.setExpectationSignatures(expectationSignatures);
     return detectionExpectation;
   }
 

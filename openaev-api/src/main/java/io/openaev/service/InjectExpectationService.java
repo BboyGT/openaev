@@ -1,21 +1,5 @@
 package io.openaev.service;
 
-import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.*;
-import static io.openaev.database.model.InjectExpectationSignature.EXPECTATION_SIGNATURE_TYPE_END_DATE;
-import static io.openaev.database.model.InjectExpectationSignature.EXPECTATION_SIGNATURE_TYPE_START_DATE;
-import static io.openaev.expectation.ExpectationType.VULNERABILITY;
-import static io.openaev.helper.StreamHelper.fromIterable;
-import static io.openaev.model.expectation.DetectionExpectation.detectionExpectationForAssetGroup;
-import static io.openaev.model.expectation.ManualExpectation.manualExpectationForAssetGroup;
-import static io.openaev.model.expectation.PreventionExpectation.preventionExpectationForAssetGroup;
-import static io.openaev.service.InjectExpectationUtils.computeScores;
-import static io.openaev.service.InjectExpectationUtils.expectationConverter;
-import static io.openaev.utils.AgentUtils.getActiveAgents;
-import static io.openaev.utils.AgentUtils.getPrimaryAgents;
-import static io.openaev.utils.ExpectationUtils.*;
-import static io.openaev.utils.VulnerabilityExpectationUtils.vulnerabilityExpectationForAssetGroup;
-import static io.openaev.utils.inject_expectation_result.ExpectationResultBuilder.*;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,14 +8,8 @@ import io.openaev.database.model.*;
 import io.openaev.database.repository.InjectExpectationRepository;
 import io.openaev.database.specification.InjectExpectationSpecification;
 import io.openaev.execution.ExecutableInject;
-import io.openaev.expectation.ExpectationPropertiesConfig;
-import io.openaev.expectation.ExpectationType;
+import io.openaev.expectation.*;
 import io.openaev.injectors.common.model.BaseInjectContent;
-import io.openaev.model.Expectation;
-import io.openaev.model.expectation.DetectionExpectation;
-import io.openaev.model.expectation.ManualExpectation;
-import io.openaev.model.expectation.PreventionExpectation;
-import io.openaev.model.expectation.VulnerabilityExpectation;
 import io.openaev.rest.atomic_testing.form.InjectExpectationAgentOutput;
 import io.openaev.rest.collector.service.CollectorService;
 import io.openaev.rest.exception.ElementNotFoundException;
@@ -46,12 +24,6 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -61,6 +33,28 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.*;
+import static io.openaev.expectation.DetectionExpectation.detectionExpectationForAssetGroup;
+import static io.openaev.expectation.ExpectationType.VULNERABILITY;
+import static io.openaev.expectation.ManualExpectation.manualExpectationForAssetGroup;
+import static io.openaev.expectation.PreventionExpectation.preventionExpectationForAssetGroup;
+import static io.openaev.helper.StreamHelper.fromIterable;
+import static io.openaev.service.InjectExpectationUtils.computeScores;
+import static io.openaev.service.InjectExpectationUtils.expectationConverter;
+import static io.openaev.utils.AgentUtils.getActiveAgents;
+import static io.openaev.utils.AgentUtils.getPrimaryAgents;
+import static io.openaev.utils.ExpectationSignatureUtils.*;
+import static io.openaev.utils.ExpectationUtils.*;
+import static io.openaev.utils.VulnerabilityExpectationUtils.vulnerabilityExpectationForAssetGroup;
+import static io.openaev.utils.inject_expectation_result.ExpectationResultBuilder.*;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -1009,7 +1003,7 @@ public class InjectExpectationService {
       @Nullable String assetId,
       @Nullable String assetGroupId,
       @NotNull InjectExpectation.EXPECTATION_TYPE expectationType,
-      @NotNull List<InjectExpectationSignature> signatures) {
+      @NotNull List<ExpectationSignature> signatures) {
     if (signatures.isEmpty()) {
       return;
     }
@@ -1040,31 +1034,9 @@ public class InjectExpectationService {
       return;
     }
 
-    String signaturesJson = convertValidSignaturesToStringJson(signatures);
-    if (signaturesJson != null) {
-      for (InjectExpectation expectation : expectations) {
-        injectExpectationLockService.applySignaturesForExpectationWithLock(
-            expectation.getId(), signaturesJson);
-      }
-    }
-  }
-
-  private String convertValidSignaturesToStringJson(
-      @NotNull List<InjectExpectationSignature> signatures) {
-    List<InjectExpectationSignature> validSignatures =
-        signatures.stream()
-            .filter(Objects::nonNull)
-            .filter(signature -> signature.getType() != null && signature.getValue() != null)
-            .toList();
-    if (validSignatures.isEmpty()) {
-      return null;
-    }
-
-    try {
-      return mapper.writeValueAsString(validSignatures);
-    } catch (JsonProcessingException e) {
-      log.warn("Failed to serialize expectation signatures", e);
-      return null;
+    for (InjectExpectation expectation : expectations) {
+      injectExpectationLockService.applySignaturesForExpectationWithLock(
+          expectation.getId(), convertToInjectExpectationSignatures(signatures, expectation));
     }
   }
 

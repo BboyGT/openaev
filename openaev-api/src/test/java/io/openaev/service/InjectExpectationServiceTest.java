@@ -1,10 +1,5 @@
 package io.openaev.service;
 
-import static io.openaev.utils.fixtures.InjectExpectationFixture.createVulnerabilityInjectExpectation;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -12,11 +7,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.openaev.database.model.*;
 import io.openaev.database.repository.InjectExpectationRepository;
 import io.openaev.execution.ExecutableInject;
+import io.openaev.expectation.*;
 import io.openaev.injectors.common.model.BaseInjectContent;
-import io.openaev.model.expectation.DetectionExpectation;
-import io.openaev.model.expectation.ManualExpectation;
-import io.openaev.model.expectation.PreventionExpectation;
-import io.openaev.model.expectation.VulnerabilityExpectation;
 import io.openaev.rest.collector.service.CollectorService;
 import io.openaev.rest.inject.form.InjectExecutionAction;
 import io.openaev.rest.inject.form.InjectExecutionInput;
@@ -26,9 +18,6 @@ import io.openaev.rest.inject.service.ExecutionProcessingContext;
 import io.openaev.rest.inject.service.InjectService;
 import io.openaev.utils.ExpectationUtils;
 import io.openaev.utils.fixtures.*;
-import java.lang.reflect.Method;
-import java.util.*;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,6 +28,15 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.stream.Stream;
+
+import static io.openaev.utils.fixtures.InjectExpectationFixture.createVulnerabilityInjectExpectation;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class InjectExpectationServiceTest {
@@ -118,7 +116,7 @@ class InjectExpectationServiceTest {
   }
 
   private void invokeComputeExpectationsForAssetAndAgents(
-      List<io.openaev.model.Expectation> expectations,
+      List<Expectation> expectations,
       BaseInjectContent content,
       AssetToExecute assetToExecute,
       Inject currentInject,
@@ -143,7 +141,7 @@ class InjectExpectationServiceTest {
   }
 
   private void invokeComputeExpectationsForAssetGroup(
-      List<io.openaev.model.Expectation> expectations,
+      List<Expectation> expectations,
       BaseInjectContent content,
       AssetGroup assetGroup)
       throws Exception {
@@ -232,7 +230,7 @@ class InjectExpectationServiceTest {
       throws Exception {
     // Arrange
     BaseInjectContent content = new BaseInjectContent();
-    List<io.openaev.model.Expectation> expectations = new ArrayList<>();
+    List<Expectation> expectations = new ArrayList<>();
     Endpoint endpoint = EndpointFixture.createEndpoint();
     endpoint.setId("asset-id");
 
@@ -253,7 +251,7 @@ class InjectExpectationServiceTest {
     BaseInjectContent content = new BaseInjectContent();
     content.setExpectations(
         List.of(createFormExpectation(InjectExpectation.EXPECTATION_TYPE.ARTICLE)));
-    List<io.openaev.model.Expectation> expectations = new ArrayList<>();
+    List<Expectation> expectations = new ArrayList<>();
     Endpoint endpoint = EndpointFixture.createEndpoint();
     endpoint.setId("asset-id");
     inject.setId("inject-id");
@@ -274,7 +272,7 @@ class InjectExpectationServiceTest {
   void given_emptyContentExpectations_should_notComputeAssetGroupExpectations() throws Exception {
     // Arrange
     BaseInjectContent content = new BaseInjectContent();
-    List<io.openaev.model.Expectation> expectations = new ArrayList<>();
+    List<Expectation> expectations = new ArrayList<>();
     AssetGroup assetGroup = AssetGroupFixture.createDefaultAssetGroup("ag");
     assetGroup.setId("ag-id");
 
@@ -345,7 +343,7 @@ class InjectExpectationServiceTest {
         ManualExpectation.manualExpectationForAsset(
             100.0, "m-other", "desc", nonMatchingAsset, assetGroup, 60L);
 
-    List<io.openaev.model.Expectation> expectations =
+    List<Expectation> expectations =
         new ArrayList<>(
             List.of(
                 preventionWithNullAsset,
@@ -386,7 +384,7 @@ class InjectExpectationServiceTest {
     inject.setId("inject-id");
 
     when(injectService.getValueTargetedAssetMap(inject)).thenReturn(Map.of());
-    List<io.openaev.model.Expectation> expectations = new ArrayList<>();
+    List<Expectation> expectations = new ArrayList<>();
 
     // Act
     invokeComputeExpectationsForAssetAndAgents(
@@ -435,7 +433,7 @@ class InjectExpectationServiceTest {
         ManualExpectation.manualExpectationForAsset(
             100.0, "m", "desc", matchingAsset, assetGroup, 60L);
 
-    List<io.openaev.model.Expectation> expectations =
+    List<Expectation> expectations =
         new ArrayList<>(
             List.of(preventionMatching, detectionMatching, vulnerabilityMatching, manualMatching));
     int initialSize = expectations.size();

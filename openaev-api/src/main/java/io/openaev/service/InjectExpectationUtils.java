@@ -1,19 +1,16 @@
 package io.openaev.service;
 
-import static io.openaev.collectors.expectations_expiration_manager.service.ExpectationsExpirationManagerService.EXPIRED;
-import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.*;
-import static io.openaev.utils.inject_expectation_result.ExpectationResultBuilder.expireEmptyResults;
-import static java.util.Optional.ofNullable;
-
 import io.openaev.collectors.expectations_expiration_manager.config.ExpectationsExpirationManagerConfig;
-import io.openaev.database.model.*;
+import io.openaev.database.model.InjectExpectation;
+import io.openaev.database.model.InjectExpectationResult;
+import io.openaev.database.model.Team;
+import io.openaev.database.model.User;
 import io.openaev.execution.ExecutableInject;
-import io.openaev.expectation.ExpectationPropertiesConfig;
-import io.openaev.model.Expectation;
-import io.openaev.model.expectation.*;
+import io.openaev.expectation.*;
 import io.openaev.utils.StringUtils;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -22,6 +19,12 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static io.openaev.collectors.expectations_expiration_manager.service.ExpectationsExpirationManagerService.EXPIRED;
+import static io.openaev.database.model.InjectExpectation.EXPECTATION_TYPE.*;
+import static io.openaev.utils.ExpectationSignatureUtils.convertToInjectExpectationSignatures;
+import static io.openaev.utils.inject_expectation_result.ExpectationResultBuilder.expireEmptyResults;
+import static java.util.Optional.ofNullable;
 
 public class InjectExpectationUtils {
 
@@ -117,15 +120,15 @@ public class InjectExpectationUtils {
       }
       case DetectionExpectation e when expectation.type() == DETECTION -> {
         injectExpectation.setDetection(e.getAgent(), e.getAsset(), e.getAssetGroup());
-        injectExpectation.setSignatures(e.getInjectExpectationSignatures());
+        injectExpectation.setSignatures(convertToInjectExpectationSignatures(e.getExpectationSignatures(), injectExpectation));
       }
       case PreventionExpectation e when expectation.type() == PREVENTION -> {
         injectExpectation.setPrevention(e.getAgent(), e.getAsset(), e.getAssetGroup());
-        injectExpectation.setSignatures(e.getInjectExpectationSignatures());
+        injectExpectation.setSignatures(convertToInjectExpectationSignatures(e.getExpectationSignatures(), injectExpectation));
       }
       case VulnerabilityExpectation e when expectation.type() == VULNERABILITY -> {
         injectExpectation.setVulnerability(e.getAgent(), e.getAsset(), e.getAssetGroup());
-        injectExpectation.setSignatures(e.getInjectExpectationSignatures());
+        injectExpectation.setSignatures(convertToInjectExpectationSignatures(e.getExpectationSignatures(), injectExpectation));
       }
       case ManualExpectation e when expectation.type() == MANUAL -> {
         injectExpectation.setManual(e.getAgent(), e.getAsset(), e.getAssetGroup());
