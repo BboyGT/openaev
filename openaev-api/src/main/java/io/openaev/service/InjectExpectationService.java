@@ -14,6 +14,7 @@ import static io.openaev.utils.ExpectationSignatureUtils.*;
 import static io.openaev.utils.ExpectationUtils.*;
 import static io.openaev.utils.VulnerabilityExpectationUtils.vulnerabilityExpectationForAssetGroup;
 import static io.openaev.utils.inject_expectation_result.ExpectationResultBuilder.*;
+import static java.time.Instant.now;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -616,7 +617,7 @@ public class InjectExpectationService {
       @NotNull Integer expirationTime,
       @NotBlank String sourceId) {
 
-    Instant expirationThreshold = Instant.now().minus(expirationTime, ChronoUnit.MINUTES);
+    Instant expirationThreshold = now().minus(expirationTime, ChronoUnit.MINUTES);
 
     return injectExpectationRepository.findAgentExpectationsNotFilledForSourceCreatedAfter(
         tenantId, type.name(), sourceId, expirationThreshold, NOT_FILLED_FETCH_LIMIT);
@@ -634,7 +635,7 @@ public class InjectExpectationService {
       @NotNull InjectExpectation.EXPECTATION_TYPE type,
       @NotNull Integer expirationTime) {
 
-    Instant expirationThreshold = Instant.now().minus(expirationTime, ChronoUnit.MINUTES);
+    Instant expirationThreshold = now().minus(expirationTime, ChronoUnit.MINUTES);
 
     return injectExpectationRepository.findAgentExpectationsNotFilledCreatedAfter(
         tenantId, type.name(), expirationThreshold, NOT_FILLED_FETCH_LIMIT);
@@ -657,7 +658,7 @@ public class InjectExpectationService {
                     .and(InjectExpectationSpecification.assetNotNull())
                     .and(
                         InjectExpectationSpecification.from(
-                            Instant.now().minus(expirationTime, ChronoUnit.MINUTES)))));
+                            now().minus(expirationTime, ChronoUnit.MINUTES)))));
   }
 
   /**
@@ -725,7 +726,7 @@ public class InjectExpectationService {
                     .and(InjectExpectationSpecification.assetNotNull())
                     .and(
                         InjectExpectationSpecification.from(
-                            Instant.now().minus(expirationTime, ChronoUnit.MINUTES)))));
+                            now().minus(expirationTime, ChronoUnit.MINUTES)))));
   }
 
   /**
@@ -819,7 +820,7 @@ public class InjectExpectationService {
                     .and(InjectExpectationSpecification.assetNotNull())
                     .and(
                         InjectExpectationSpecification.from(
-                            Instant.now().minus(expirationTime, ChronoUnit.MINUTES)))));
+                            now().minus(expirationTime, ChronoUnit.MINUTES)))));
   }
 
   /**
@@ -1070,7 +1071,18 @@ public class InjectExpectationService {
       @NotBlank final Instant date,
       @NotBlank final String signatureType) {
     // Insert the signature for all agent and inject in one query
-    injectExpectationRepository.insertSignature(signatureType, date.toString(), injectId, agentId);
+    List<InjectExpectation> injectExpectations =
+        injectExpectationRepository.findAllByInjectAndAgent(injectId, agentId);
+    if (!injectExpectations.isEmpty()) {
+      injectExpectations.forEach(
+          injectExpectation -> {
+            InjectExpectationSignature signature =
+                new InjectExpectationSignature(
+                    injectExpectation, signatureType, date.toString(), now());
+            injectExpectation.getSignatures().add(signature);
+          });
+      injectExpectationRepository.saveAll(injectExpectations);
+    }
   }
 
   /**
