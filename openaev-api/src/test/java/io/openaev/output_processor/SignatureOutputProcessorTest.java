@@ -16,11 +16,7 @@ import io.openaev.rest.inject.service.ContractOutputContext;
 import io.openaev.rest.inject.service.ExecutionProcessingContext;
 import io.openaev.rest.inject.service.InjectService;
 import io.openaev.rest.settings.PreviewFeature;
-import io.openaev.service.AssetGroupService;
-import io.openaev.service.InjectExpectationLockService;
-import io.openaev.service.InjectExpectationService;
-import io.openaev.service.PreviewFeatureService;
-import io.openaev.service.SecurityCoverageSendJobService;
+import io.openaev.service.*;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -191,8 +187,8 @@ class SignatureOutputProcessorTest {
     processor.process(
         executionProcessingContext, contractOutputContext, objectMapper.readTree(secondPayload));
 
-    verify(injectExpectationRepository, times(1)).clearSignaturesAndMarkInitialized("exp-1");
-    verify(injectExpectationRepository, times(2)).appendSignatures(eq("exp-1"), any());
+    verify(injectExpectationRepository, times(1)).save(firstCallExpectation);
+    verify(injectExpectationRepository, times(1)).save(secondCallExpectation);
   }
 
   @Test
@@ -347,8 +343,7 @@ class SignatureOutputProcessorTest {
             processor.process(
                 executionProcessingContext, contractOutputContext, objectMapper.readTree(payload)));
 
-    verify(injectExpectationRepository, never()).clearSignaturesAndMarkInitialized(eq("exp-1"));
-    verify(injectExpectationRepository, never()).appendSignatures(eq("exp-1"), any());
+    verify(injectExpectationRepository, never()).save(any());
   }
 
   // -------------------------------------------------------------------------
@@ -705,7 +700,8 @@ class SignatureOutputProcessorTest {
       processor.process(ctx, buildContractCtx(), objectMapper.readTree(payload));
 
       // -- Assert --
-      verify(injectExpectationRepository).appendSignatures(eq("exp-fallback"), any());
+
+      verify(injectExpectationRepository).save(expectation);
     }
   }
 
@@ -757,7 +753,7 @@ class SignatureOutputProcessorTest {
 
       // -- Assert --
       verify(injectExpectationRepository).findAllByInjectAndAssetGroup("inject-1", "group-1");
-      verify(injectExpectationRepository).appendSignatures(eq("exp-group"), any());
+      verify(injectExpectationRepository).save(expectation);
     }
 
     @Test

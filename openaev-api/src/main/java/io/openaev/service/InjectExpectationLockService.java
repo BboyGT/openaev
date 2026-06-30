@@ -33,6 +33,7 @@ public class InjectExpectationLockService {
     } else {
       expectation.getSignatures().addAll(signatures);
     }
+    expectation.setSignaturesInitialized(true);
     injectExpectationRepository.save(expectation);
   }
 }
