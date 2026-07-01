@@ -6,7 +6,8 @@ import org.flywaydb.core.api.migration.Context;
 import org.springframework.stereotype.Component;
 
 @Component
-public class V5_34__Add_inject_expectation_signatures_initialized extends BaseJavaMigration {
+public class V6_20260630122959088__Add_inject_expectation_signatures_initialized
+    extends BaseJavaMigration {
   @Override
   public void migrate(Context context) throws Exception {
     try (Statement statement = context.getConnection().createStatement()) {
