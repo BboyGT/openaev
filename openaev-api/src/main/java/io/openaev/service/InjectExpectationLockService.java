@@ -29,7 +29,8 @@ public class InjectExpectationLockService {
             .orElseThrow(ElementNotFoundException::new);
 
     if (!expectation.isSignaturesInitialized()) {
-      expectation.setSignatures(signatures);
+      expectation.getSignatures().clear();
+      expectation.getSignatures().addAll(signatures);
     } else {
       expectation.getSignatures().addAll(signatures);
     }
