@@ -21,6 +21,8 @@ import java.util.Objects;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import org.hibernate.annotations.Type;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
@@ -114,6 +116,7 @@ public class InjectExpectation implements Base, Cloneable {
       cascade = CascadeType.ALL,
       orphanRemoval = true,
       fetch = FetchType.LAZY)
+  @Fetch(FetchMode.SUBSELECT)
   @JsonProperty("inject_expectation_signatures")
   private List<InjectExpectationSignature> signatures = new ArrayList<>();
 
