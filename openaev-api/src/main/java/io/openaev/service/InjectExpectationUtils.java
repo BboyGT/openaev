@@ -119,18 +119,30 @@ public class InjectExpectationUtils {
       }
       case DetectionExpectation e when expectation.type() == DETECTION -> {
         injectExpectation.setDetection(e.getAgent(), e.getAsset(), e.getAssetGroup());
-        injectExpectation.setSignatures(
-            convertToInjectExpectationSignatures(e.getExpectationSignatures(), injectExpectation));
+        injectExpectation.getSignatures().clear();
+        injectExpectation
+            .getSignatures()
+            .addAll(
+                convertToInjectExpectationSignatures(
+                    e.getExpectationSignatures(), injectExpectation));
       }
       case PreventionExpectation e when expectation.type() == PREVENTION -> {
         injectExpectation.setPrevention(e.getAgent(), e.getAsset(), e.getAssetGroup());
-        injectExpectation.setSignatures(
-            convertToInjectExpectationSignatures(e.getExpectationSignatures(), injectExpectation));
+        injectExpectation.getSignatures().clear();
+        injectExpectation
+            .getSignatures()
+            .addAll(
+                convertToInjectExpectationSignatures(
+                    e.getExpectationSignatures(), injectExpectation));
       }
       case VulnerabilityExpectation e when expectation.type() == VULNERABILITY -> {
         injectExpectation.setVulnerability(e.getAgent(), e.getAsset(), e.getAssetGroup());
-        injectExpectation.setSignatures(
-            convertToInjectExpectationSignatures(e.getExpectationSignatures(), injectExpectation));
+        injectExpectation.getSignatures().clear();
+        injectExpectation
+            .getSignatures()
+            .addAll(
+                convertToInjectExpectationSignatures(
+                    e.getExpectationSignatures(), injectExpectation));
       }
       case ManualExpectation e when expectation.type() == MANUAL -> {
         injectExpectation.setManual(e.getAgent(), e.getAsset(), e.getAssetGroup());
