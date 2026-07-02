@@ -15,6 +15,30 @@ runs if specific conditions on its parent are met at execution time. Conditions 
 - **Reduce noise**: skip follow-up Injects when a prerequisite was blocked.
 - **Test decision trees**: simulate branching attacker behavior depending on defensive outcomes.
 
+### How chaining works
+
+An Inject chain is evaluated as a workflow. The chain definition acts as the template, and OpenAEV creates runtime
+steps when the Simulation or Scenario runs. Each step follows a lifecycle from ready, to running, to ended.
+
+The chaining engine evaluates conditions before starting a child step. Conditions can compare execution results,
+Expectation values, mapped values, or dependencies between steps. When a parent step finishes, OpenAEV updates the
+workflow state and propagates the relevant outputs to dependent child steps before evaluating the next condition.
+
+OpenAEV processes chaining events asynchronously:
+
+| Component | Role |
+|-----------|------|
+| Workflow state | Stores outputs produced during the chain so later steps can reuse them. |
+| Ready queue | Holds steps that are ready for execution. |
+| Update queue | Receives execution updates from Inject lifecycle events. |
+| Delay handling | Schedules time-based waits without blocking a worker. |
+| Timeout handling | Ends workflow runs that exceed their configured execution window. |
+
+!!! note
+
+    Chaining depends on the Inject chaining preview feature being enabled on the platform. If the Logical Chains tab or
+    timeline linking controls are not visible, check the platform feature settings and your edition permissions.
+
 ### Option 1: from the Inject update form
 
 1. Open an Inject and go to the **Logical Chains** tab.
@@ -115,4 +139,3 @@ Your red team built a set of credential-dumping Injects in a lab Scenario:
 - Build complete attack chains with [Scenarios](scenario.md).
 - Import Injects from threat intelligence using [Scenario generation from OpenCTI](scenario/security-coverage.md).
 - Understand [Inject statuses](inject-status.md) to interpret execution results.
-
